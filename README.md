@@ -1,166 +1,214 @@
-<p align="center">
-  <a href="https://github.com/AmbiqAI/neuralSPOT"><img src="./docs/images/banner.png" alt="neuralSPT"></a>
-</p>
+# PERSEV.ai Speech Enhancement Bare Metal Demo
 
----
+This software showcases real-time speech enhancement that will be used in a custom circuit board that fits in an ear bud. The software works by capturing audio from a PDM microphone, processes it through a neural network for speech enhancement, and outputs the enhanced audio via I2S to a DAC. The DAC sends analog audio to the ear bud's driver and speaker.
 
-> *Code*: [https://github.com/AmbiqAI/neuralSPOT](https://github.com/AmbiqAI/neuralSPOT)
->
-> *Documentation*: [https://ambiqai.github.io/neuralSPOT](https://ambiqai.github.io/neuralSPOT)
+## Module Architecture
 
----
-
-NeuralSPOT is a full-featured AI SDK and toolkit optimized for Ambiqs's Apollo family of ultra-low-power SoCs. It is open-source, real-time, and OS-agnostic. It was designed with Tensorflow Lite for Microcontrollers in mind, but works with any AI runtime.
-
-NeuralSPOT is designed to help embedded AI developers in 3 important ways:
-
-1. **Initial development and fine-tuning of their AI model**: neuralSPOT offers tools to rapidly [characterize the performance and size](./docs/From%20TF%20to%20EVB%20-%20testing,%20profiling,%20and%20deploying%20AI%20models.md) of a TFLite model on Ambiq processors.
-2. **Rapid AI feature prototyping**: neuralSPOT's library of easy to use drivers, feature extractors, helper functions, and communication mechanisms accelerate the development of stand-alone AI feature applications to test the model in real-world situations with real-world data and latencies.
-3. **AI model library export**: once an AI model has been developed and refined via prototyping, neuralSPOT allows one-click deployment of a static library implementing the AI model, suitable to linking into larger embedded applications.
-
-
-NeuralSPOT wraps an AI-centric API around AmbiqSuite SDK (Ambiq's hardware abstraction layer) to ease common tasks such as sensing, computing features from the sensor data, performance profiling, and controlling Ambiq's many on-board peripherals.
-
-<p align="center">
-<img src="./docs/images/hard-stuff.png" alt="neuralspot helps with the hard stuff" style="width:75%;" align=center />
-</p>
-
-
-## Requirements
-
-> **NOTE** for detailed compatibility notes, see the [features document](https://github.com/AmbiqAI/neuralSPOT/blob/main/docs/features.md).
-
-* **Hardware**
-    * [Ambiq EVB](https://ambiq.com/apollo4/): at least one of [Apollo4 Plus](https://ambiq.com/apollo4-plus/), [Apollo4 Blue Plus](https://ambiq.com/apollo4-blue-plus/), [Apollo4 Lite](https://ambiq.com/apollo4-lite/), [Apollo4 Blue Lite](https://ambiq.com/apollo4-blue-lite/), [Apollo3 Blue Plus](https://ambiq.com/apollo3-blue-plus/), or Ambiq's flagship, the [Apollo510](https://ambiq.com/apollo510/).
-    * Energy Measurement (optional): [Joulescope](https://www.joulescope.com)  JS110 or JS220 (only needed for automated model energy measurements)
-    * Sensors: some of neuralSPOT's example applications require sensors such as microphones, IMUs, ECG/PPG sensors, and cameras. See the application's README for detailed requirements. 
-* **Software**
-    * [Segger J-Link 8.12+](https://www.segger.com/downloads/jlink/)
-    * Compilers: at least one of...
-        * [Arm GNU Toolchain 10.3+](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
-        * [Armclang](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads)
-    * [GNU Make](https://www.gnu.org/software/make/)
-    * [Python 3.11+](https://www.python.org)
-
-## Building and Deploying NeuralSPOT
-
-NeuralSPOT makes it easy to build and deploy your first AI model on Ambiq's EVBs. Before deploying, connect an Ambiq EVB (the following example defaults to Apollo4 Plus).
-
-```bash
-git clone git@github.com:AmbiqAI/neuralSPOT.git
-cd neuralSPOT
-make clean
-make -j # makes everything
-make deploy # flashes the default example to EVB
-make view # connects to the Jlink SWO interface to show printf output from EVB
+```mermaid
+graph TD
+    A[Main Application] --> B[PDM Module]
+    A --> C[I2S Module]
+    A --> D[Speech Enhancement Module]
+    A --> E[Button Module]
+    A --> F[LED Module]
+    A --> G[Timer Module]
+    A --> H[Performance Profiler]
+    D --> I[Neural Network Controller]
+    I --> J[Feature Module]
+    I --> K[NN Speech Module]
+    I --> L[Neural Nets Module]
 ```
 
-The `make` systems is highly configurable and flexible - see our [makefile options document](docs/makefile-details.md) for more details.
 
-See our [Windows application note](https://github.com/AmbiqAI/neuralSPOT/blob/main/docs/Application-Note-neuralSPOT-and-Windows.md) for Windows-specific considerations.
+## Overview
 
-## Automatic Model Characterization and Packaging
+The application is made up of several functions:
+- PDM microphone audio capture
+- Real-time speech enhancement using neural networks
+- I2S audio output to external DAC
+- Button control for toggling speech enhancement
+- LED indication of processing status
+- Performance profiling capabilities
 
-NeuralSPOT includes Autodeploy, a tool to automatically analyze, build, characterize, and package TFLite models. Autodeploy makes use of RPC, so it needs both USB ports to be connected (one for Jlink and one for RPC).
+## Hardware Setup
 
-### Using UV (recommended)
-```bash
-$> cd .../neuralSPOT # neuralSPOT's root directory
-$> uv sync
-$> source .venv/bin/activate
-$> ns_autodeploy --tflite-filename mymodel.tflite
-```
+For development, an Apollo4 Blue EVB is required. A Blue Lite version will also work.
 
-### Using PIP
-```bash
-$> cd .../neuralSPOT # neuralSPOT's root directory
-$> pip install .
-$> ns_autodeploy --tflite-filename mymodel.tflite
-```
 
-This one invocation will:
+Note: the specific GPIO settings are SOC specific and will need to be modified for a custom board that make use different GPIO pins than the EVB.
 
-1. **Analyze the specified TFLite model** file to determine needed ops, input and output tensors, etc.
-1. Convert the TFlite into a C file, wrap it in a baseline neuralSPOT application, and flash it to an EVB
-1. Perform an initial characterization over USB using RPC and use the results to **fine-tune the application's memory allocation**, then flash the fine-tuned version.
-1. Run invoke() both locally and on the EVB, feeding the same data to both, **comparing the results and profiling the performance of the invoke() on the EVB**
-1. **Create a static library** (with headers) containing the model, TFLM, and a minimal wrapper to ease integration into applications.
-1. Create a simple AmbiqSuite example suitable for copying into AmbiqSuites example directory.
+# Apollo4L_Blue Evaluation board settings:
+- PDM:
+  - PDM0_CLK: GPIO 50   (J10 Pin 4) Microphone
+  - PDM0_DATA: GPIO 51  (J10 Pin 5) Microphone
+- I2S Output (DAC):
+  - I2S0_CLK: GPIO 47   (J12 Pin 5)  Audio Out
+  - I2S0_DATA: GPIO 12  (J9 Pin 16)  Audio Out
+  - I2S0_WS: GPIO 49    (J12 Pin 3)  Audio Out
+  - IOM1_SCL: GPIO 8    (J11 PIN 3)  DAC Control
+  - IOM1_SDA: GPIO 9    (J11 PIN 1)  DAC Control
+- User Interface:
+  - Button 0: GPIO 18 (SW1 on Apollo4L Blue EVB)
+  - Button 1: GPIO 19 (Reserved/Unused)
+  - LED 0: GPIO 12 (Reserved - shares I2S_DATA pin)
+  - LED 1: GPIO 15 (Used for SE status indication)
+  - LED 2: GPIO 16
 
-Autodeploy is highly configurable and also **capable of automatically measuring the power** used by inference (if a joulescope is available) - see the [reference guide](https://github.com/AmbiqAI/neuralSPOT/blob/main/tools/README.md) and [application note](https://github.com/AmbiqAI/neuralSPOT/blob/main/docs/From%20TF%20to%20EVB%20-%20testing%2C%20profiling%2C%20and%20deploying%20AI%20models.md) for more details.
-
-## DAC Data Interface Format
-
-NeuralSPOT applications that output audio to external DACs use the I2S (Inter-IC Sound) interface with the following specifications:
-
-### Audio Data Format
-- **Sample Rate**: Configurable (typically 16kHz or 48kHz)
-- **Bit Depth**: 16-bit signed integers (little-endian)
-- **Channels**: Mono or Stereo (configurable)
-- **Data Type**: PCM (Pulse Code Modulation)
-- **Buffer Size**: Frame-based (configurable sample count per frame)
-
-### I2S Interface Specifications
-- **Protocol**: Standard I2S (Philips format)
-- **Clock Polarity**: Rising edge data capture
-- **Word Select**: Left-justified (WS low = left channel, WS high = right channel)
-- **Data Alignment**: MSB-first, no padding
-
-### Hardware Connections (Typical)
-- **I2S0_CLK**: Master clock output (GPIO varies by platform)
-- **I2S0_WS**: Word select/left-right clock (GPIO 13 on Apollo5 EVB)
-- **I2S0_DATA**: Serial data output (GPIO varies by platform)
-- **MCLK**: Master clock (optional, platform dependent)
-
-### Buffer Management
-- **Double/Triple Buffering**: Used to prevent audio glitches
-- **DMA Transfer**: Hardware-accelerated data movement
-- **Interrupt-Driven**: Callbacks notify when buffers need refilling
-- **Ring Buffer Support**: Optional circular buffer implementation
-
-### Configuration Example
-```c
-// Typical audio configuration structure
-ns_audio_config_t audioConfig = {
-    .api = &ns_audio_V2_1_0,
-    .eAudioApiMode = NS_AUDIO_API_CALLBACK,
-    .callback = audio_frame_callback,
-    .audioBuffer = (void *)&audioDataBuffer,
-    .eAudioSource = NS_AUDIO_SOURCE_PDM,
-    .numChannels = 1,        // Mono output
-    .numSamples = 480,       // Samples per frame
-    .sampleRate = 16000,     // 16kHz sample rate
-    .audioSystemHandle = NULL,
-    .bufferHandle = NULL
-};
-```
+## Software Architecture
 
 ### Data Flow
-1. Neural network processes audio frames
-2. Post-processing applies gain, clipping, smoothing
-3. PCM data is buffered in memory
-4. DMA transfers data to I2S peripheral
-5. I2S serializes data to external DAC
+1. PDM peripheral captures audio samples from microphone
+2. DMA transfers samples to memory buffers
+3. Neural network processes audio for speech enhancement
+4. I2S peripheral streams processed audio to DAC
+5. NeuralSPOT button peripheral handles user input
+6. LEDs provide visual processing status feedback
+7. Real-time diagnostics via SEGGER RTT
 
-### Platform Variations
-Different Ambiq platforms may have different GPIO mappings for I2S pins. Check the specific board support package (BSP) files for exact pin assignments.
+### Buffer Management and Synchronization
 
-## NeuralSPOT Structure and Directories
-NeuralSPOT consists of the neuralspot [libraries](https://github.com/AmbiqAI/neuralSPOT/tree/main/neuralspot), required external components, [tools](https://github.com/AmbiqAI/neuralSPOT/tree/main/tools), [applications](https://github.com/AmbiqAI/neuralSPOT/tree/main/apps), and [documentation](https://github.com/AmbiqAI/neuralSPOT/tree/main/docs).
+The application uses a sophisticated ping-pong buffering system with DMA to ensure seamless audio streaming:
 
-![Layers](./docs/images/ns-layercake.png)
+#### Ping-Pong Buffering
+- The system uses two buffers (ping and pong) that alternate between being filled by PDM and read by I2S
+- When one buffer is being filled by PDM, the other is being read by I2S
 
+#### DMA Interrupts
+- When PDM finishes filling a buffer, it generates a DMA completion interrupt (AM_HAL_PDM_INT_DCMP)
+- When I2S finishes reading a buffer, it generates its own DMA completion interrupt (AM_HAL_I2S_INT_TXDMACPL)
 
-The directory structure reflects the code structure:
+#### Buffer Swapping
+- Hardware automatically alternates between the two buffers
+- When PDM finishes buffer 1, it starts filling buffer 2
+- When I2S finishes reading buffer 1, it starts reading buffer 2
+- This creates a seamless flow where one buffer is always being filled while the other is being read
+
+#### Synchronization
+- The g_bPDMDataReady flag is set in the PDM interrupt handler when a buffer is filled
+- The main loop processes the data when this flag is set
+- The buffer swapping happens automatically at the hardware level through DMA
+
+This system ensures that:
+- Data is never overwritten before being sent to the DAC
+- The CPU is only notified when a complete buffer is ready for processing
+- Both PDM and I2S can operate continuously without blocking each other
+- There's no need for explicit buffer management - the hardware handles it automatically
+
+## Recent Enhancements (January 2026)
+
+### Button Control System
+- Implemented neuralSPOT button peripheral for reliable button handling
+- Button 0 (GPIO 18) now toggles speech enhancement on/off
+- Uses the `ns_peripherals_button.h` interface with proper debouncing
+- Immediate visual and textual feedback on button presses
+
+### LED Status Indication
+- LED 1 (GPIO 15) provides visual confirmation of SE state
+- LED ON when speech enhancement is enabled (active-LOW implementation)
+- LED OFF when speech enhancement is disabled
+- Uses dedicated pin to avoid I2S audio output conflicts
+- Dual feedback system with both LED and RTT console output
+
+### Diagnostic Improvements
+- Enhanced RTT logging with current SE state after each button press
+- Clear ENABLED/DISABLED status messages
+- Streamlined diagnostic output for better user experience
+
+### Hardware Integration
+- Verified correct GPIO assignments for Apollo4L Blue EVB
+- Proper initialization of button peripheral and LED outputs
+- Active-LOW handling for both buttons and LEDs
+- **Pin Conflict Resolution**: Uses LED1 (GPIO 15) instead of LED0 to avoid I2S_DATA pin sharing
+
+## Building and Running
+Note: alter the following make commands to match your directory structure.
+
+### Build Commands
+```bash
+# Clean previous builds
+make clean
+
+# Build the demo
+make EXAMPLE=demos/nnse_baremetal_ap4l  PLATFORM=apollo4l_blue_evb AS_VERSION=R4.5.0 -j22
+
+# Deploy to target
+make EXAMPLE=demos/nnse_baremetal_ap4l deploy PLATFORM=apollo4l_blue_evb AS_VERSION=R4.5.0 -j22
+```
+
+### Runtime Controls
+- Button 0: Toggle speech enhancement on/off
+- LED 1: Indicates when speech enhancement is active (ON/bright) or bypassed (OFF/dark)
+- Real-time status reporting via SEGGER RTT showing current SE state
+
+## Performance Profiling
+
+The application includes performance monitoring capabilities:
+- Audio frame processing counters
+- FIFO overflow detection
+- Latency measurements
+- Periodic status reporting via RTT
+
+## Customization
+
+### Platform Support
+This demo is configured for Apollo4l_blue_evb but can be adapted to other Apollo platforms by modifying:
+- Pin configurations in am_bsp_pins.h
+- Platform-specific settings in makefiles
+- Board support package integration
+
+### Audio Parameters
+Key audio parameters can be adjusted:
+- PDM decimation rate
+- Sample rate
+- Buffer sizes
+- Gain settings
+
+## Repository Structure
 
 ```
-/neuralspot - contains all code for NeuralSPOT libraries
-	/neuralspot # Sensor, communications, and helper libraries
-	/extern     # External dependencies, including TF and AmbiqSuite
-	/apps       # Example applications, each of which can be compiled to a deployable binary
-	/projects   # Examples of how to integrate external projects such as EdgeImpulse models
-	/make       # Makefile helpers, including neuralspot-config.mk and local_overrides.mk
-	/tools	    # AutoDeploy and RPC python-based tools
-	/tests      # Simple compatibility tests
-	/docs       # introductory documents, guides, and release notes
+nnse_baremetal/
+├── src/                 # Source code files
+├── libs/                # Pre-compiled neural network library
+├── README.md           # This file
+├── BUILDING.md         # Detailed build instructions
+├── HARDWARE_NOTES.md   # Hardware modification details
+├── module.mk           # Module definition for NeuralSPOT build system
+└── Makefile            # Standalone build file
 ```
+
+## Building
+
+
+### Quick Build with Make
+
+To build the project using the standalone Makefile, simply run:
+
+```bash
+make
+```
+
+The output binary will be located in the `build/` directory.
+
+
+## Dependencies
+
+This project depends on the AmbiqSuite SDK and NeuralSPOT libraries. For a complete build environment, please refer to the original NeuralSPOT repository.
+
+## Troubleshooting Compilation Issues
+
+### IDE/Editor Errors
+
+When viewing the code in IDEs or editors that don't have the proper project configuration, you may see errors like:
+- `'am_mcu_apollo.h' file not found`
+- `Unknown type name 'IRQn_Type'`
+- `Use of undeclared identifier 'PDM0_IRQn'`
+- `Unknown type name 'AM_SHARED_RW'`
+- `Unknown type name 'am_hal_pdm_config_t'`
+
+These errors are not related to actual code issues, but rather to the IDE/editor not having the correct include paths set up for the Ambiq Apollo SDK. These errors would not prevent successful compilation when using the proper build system (Makefile) provided with the neuralSPOT project, as it sets up all the necessary include paths and toolchain configurations.
+
+To compile this project successfully, you should use the provided Makefile rather than trying to compile individual files directly in an IDE that doesn't have the proper project configuration.
+
+## License
+
+This project inherits the license from the original NeuralSPOT repository.
